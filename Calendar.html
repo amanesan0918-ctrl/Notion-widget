@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendar Widget</title>
+<style>
+  :root {
+    --accent: #6B7C93;
+    --accent-light: #A9BCCF;
+    --accent-pale: #E0F2FE;
+    --bg: #FFFFFF;
+    --text: #45525F;
+    --text-soft: #9BAAB8;
+    --text-faint: #D9E3EC;
+    --line: #E8F2FA;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+  }
+
+  body {
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: transparent;
+    color: var(--text);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 6px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 240px;
+    background: var(--bg);
+    border-radius: 16px;
+    padding: 14px 14px 12px;
+    box-shadow: 0 1px 2px rgba(107, 124, 147, 0.08), 0 8px 20px rgba(107, 124, 147, 0.10);
+    border: 1px solid var(--line);
+  }
+
+  .ribbon {
+    width: 28px;
+    height: 3px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-light));
+    margin: 0 auto 10px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .nav-btn {
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .nav-btn:hover {
+    background: var(--accent-pale);
+  }
+
+  .month-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.3px;
+    cursor: default;
+    user-select: none;
+  }
+
+  .weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 2px;
+  }
+
+  .weekdays span {
+    text-align: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-soft);
+    padding: 3px 0;
+  }
+
+  .weekdays span:first-child {
+    color: #F0A8A8;
+  }
+
+  .weekdays span:last-child {
+    color: #7FA8D9;
+  }
+
+  .days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    row-gap: 4px;
+  }
+
+  .day {
+    position: relative;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .day span {
+    width: 19px;
+    height: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 9.5px;
+    color: var(--text);
+    transition: background 0.15s ease;
+  }
+
+  .day.outside span {
+    color: var(--text-faint);
+  }
+
+  .day.sunday span {
+    color: #F0A8A8;
+  }
+
+  .day.saturday span {
+    color: #7FA8D9;
+  }
+
+  .day.outside.sunday span,
+  .day.outside.saturday span {
+    color: var(--text-faint);
+  }
+
+  .day.today span {
+    background: linear-gradient(135deg, var(--accent), #8FA3BD);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 3px 8px rgba(107, 124, 147, 0.35);
+  }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .today-btn {
+    border: none;
+    background: linear-gradient(135deg, var(--accent), #8FA3BD);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 5px 13px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 3px 8px rgba(107, 124, 147, 0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .today-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 11px rgba(107, 124, 147, 0.32);
+  }
+
+  .today-btn:active {
+    transform: translateY(0);
+  }
+
+  .today-btn svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  @media (max-width: 360px) {
+    .card { max-width: 200px; padding: 12px 10px 10px; }
+    .day span { width: 17px; height: 17px; font-size: 8.5px; }
+    .month-title { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="ribbon"></div>
+  <div class="header">
+    <button class="nav-btn" id="prevBtn" aria-label="前の月">&#10094;</button>
+    <div class="month-title" id="monthTitle"></div>
+    <button class="nav-btn" id="nextBtn" aria-label="次の月">&#10095;</button>
+  </div>
+  <div class="weekdays">
+    <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+  </div>
+  <div class="days" id="daysGrid"></div>
+  <div class="footer">
+    <button class="today-btn" id="todayBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+      今日
+    </button>
+  </div>
+</div>
+
+<script>
+  const monthTitle = document.getElementById('monthTitle');
+  const daysGrid = document.getElementById('daysGrid');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const todayBtn = document.getElementById('todayBtn');
+
+  const today = new Date();
+  let viewYear = today.getFullYear();
+  let viewMonth = today.getMonth(); // 0-indexed
+
+  function render() {
+    monthTitle.textContent = `${viewYear}年 ${viewMonth + 1}月`;
+    daysGrid.innerHTML = '';
+
+    const firstDayOfMonth = new Date(viewYear, viewMonth, 1);
+    const lastDayOfMonth = new Date(viewYear, viewMonth + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
+    const startWeekday = firstDayOfMonth.getDay(); // 0 = Sunday
+
+    const prevMonthLastDate = new Date(viewYear, viewMonth, 0).getDate();
+
+    const cells = [];
+
+    // Leading days (previous month)
+    for (let i = startWeekday - 1; i >= 0; i--) {
+      cells.push({ date: prevMonthLastDate - i, outside: true });
+    }
+
+    // Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ date: d, outside: false });
+    }
+
+    // Trailing days (next month) to complete final week row
+    const remainder = cells.length % 7;
+    if (remainder !== 0) {
+      const trailing = 7 - remainder;
+      for (let d = 1; d <= trailing; d++) {
+        cells.push({ date: d, outside: true, isNext: true });
+      }
+    }
+
+    cells.forEach((cell, idx) => {
+      const weekday = idx % 7;
+      const dayEl = document.createElement('div');
+      dayEl.className = 'day';
+      if (cell.outside) dayEl.classList.add('outside');
+      if (weekday === 0) dayEl.classList.add('sunday');
+      if (weekday === 6) dayEl.classList.add('saturday');
+
+      const isToday =
+        !cell.outside &&
+        viewYear === today.getFullYear() &&
+        viewMonth === today.getMonth() &&
+        cell.date === today.getDate();
+
+      if (isToday) dayEl.classList.add('today');
+
+      const span = document.createElement('span');
+      span.textContent = cell.date;
+      dayEl.appendChild(span);
+      daysGrid.appendChild(dayEl);
+    });
+  }
+
+  prevBtn.addEventListener('click', () => {
+    viewMonth--;
+    if (viewMonth < 0) {
+      viewMonth = 11;
+      viewYear--;
+    }
+    render();
+  });
+
+  nextBtn.addEventListener('click', () => {
+    viewMonth++;
+    if (viewMonth > 11) {
+      viewMonth = 0;
+      viewYear++;
+    }
+    render();
+  });
+
+  todayBtn.addEventListener('click', () => {
+    viewYear = today.getFullYear();
+    viewMonth = today.getMonth();
+    render();
+  });
+
+  render();
+</script>
+
+</body>
+</html>
