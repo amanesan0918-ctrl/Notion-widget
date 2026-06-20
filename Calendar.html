@@ -151,8 +151,13 @@
     color: #7FA8D9;
   }
 
+  .day.holiday span {
+    color: #F0A8A8;
+  }
+
   .day.outside.sunday span,
-  .day.outside.saturday span {
+  .day.outside.saturday span,
+  .day.outside.holiday span {
     color: var(--text-faint);
   }
 
@@ -241,6 +246,86 @@
   let viewYear = today.getFullYear();
   let viewMonth = today.getMonth(); // 0-indexed
 
+  // --- 日本の祝日判定ロジック ---
+
+  // 春分の日・秋分の日の近似計算（国立天文台の計算式に基づく、おおよそ2099年まで有効）
+  function vernalEquinoxDay(year) {
+    return Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  }
+  function autumnalEquinoxDay(year) {
+    return Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  }
+
+  // 指定月の第n週目の指定曜日の日付を返す（ハッピーマンデー用）
+  function nthWeekday(year, month, weekday, n) {
+    const firstDay = new Date(year, month, 1).getDay();
+    let date = 1 + ((weekday - firstDay + 7) % 7) + (n - 1) * 7;
+    return date;
+  }
+
+  // 指定年の祝日一覧を { "M-D": "祝日名" } 形式で返す
+  function getHolidays(year) {
+    const holidays = {};
+    const add = (month, date, name) => {
+      holidays[`${month}-${date}`] = name;
+    };
+
+    add(1, 1, '元日');
+    add(1, nthWeekday(year, 0, 1, 2), '成人の日'); // 1月第2月曜
+    add(2, 11, '建国記念の日');
+    if (year >= 2020) add(2, 23, '天皇誕生日');
+    add(3, vernalEquinoxDay(year), '春分の日');
+    add(4, 29, '昭和の日');
+    add(5, 3, '憲法記念日');
+    add(5, 4, 'みどりの日');
+    add(5, 5, 'こどもの日');
+    add(7, nthWeekday(year, 6, 1, 3), '海の日'); // 7月第3月曜
+    if (year >= 2016) add(8, 11, '山の日');
+    add(9, nthWeekday(year, 8, 1, 3), '敬老の日'); // 9月第3月曜
+    add(9, autumnalEquinoxDay(year), '秋分の日');
+    add(10, nthWeekday(year, 9, 1, 2), 'スポーツの日'); // 10月第2月曜
+    add(11, 3, '文化の日');
+    add(11, 23, '勤労感謝の日');
+
+    // 国民の休日：前日・翌日がともに祝日で、自身が日曜でも祝日でもない平日を休日とする
+    const baseEntries = Object.entries(holidays);
+    baseEntries.forEach(([key]) => {
+      const [m, d] = key.split('-').map(Number);
+      const dateObj = new Date(year, m - 1, d);
+      const next = new Date(year, m - 1, d + 1);
+      const nextKey = `${next.getMonth() + 1}-${next.getDate()}`;
+      const afterNext = new Date(year, m - 1, d + 2);
+      const afterNextKey = `${afterNext.getMonth() + 1}-${afterNext.getDate()}`;
+
+      // dateObj が祝日、afterNext も祝日、間の next が祝日でも日曜でもない場合
+      if (holidays[key] && holidays[afterNextKey] && !holidays[nextKey] && next.getDay() !== 0) {
+        holidays[nextKey] = '国民の休日';
+      }
+    });
+
+    // 振替休日（祝日が日曜の場合、直後の平日を振替休日に）
+    const entries = Object.entries(holidays);
+    entries.forEach(([key, name]) => {
+      const [m, d] = key.split('-').map(Number);
+      const dateObj = new Date(year, m - 1, d);
+      if (dateObj.getDay() === 0) {
+        let sub = new Date(year, m - 1, d + 1);
+        while (holidays[`${sub.getMonth() + 1}-${sub.getDate()}`]) {
+          sub = new Date(sub.getFullYear(), sub.getMonth(), sub.getDate() + 1);
+        }
+        holidays[`${sub.getMonth() + 1}-${sub.getDate()}`] = '振替休日';
+      }
+    });
+
+    return holidays;
+  }
+
+  function isHoliday(year, month, date) {
+    // month は 0-indexed の月を想定
+    const holidays = getHolidays(year);
+    return Boolean(holidays[`${month + 1}-${date}`]);
+  }
+
   function render() {
     monthTitle.textContent = `${viewYear}年 ${viewMonth + 1}月`;
     daysGrid.innerHTML = '';
@@ -251,17 +336,25 @@
     const startWeekday = firstDayOfMonth.getDay(); // 0 = Sunday
 
     const prevMonthLastDate = new Date(viewYear, viewMonth, 0).getDate();
+    // 前月・翌月の年月（年またぎ対応）
+    const prevMonthDate = new Date(viewYear, viewMonth - 1, 1);
+    const nextMonthDate = new Date(viewYear, viewMonth + 1, 1);
 
     const cells = [];
 
     // Leading days (previous month)
     for (let i = startWeekday - 1; i >= 0; i--) {
-      cells.push({ date: prevMonthLastDate - i, outside: true });
+      cells.push({
+        date: prevMonthLastDate - i,
+        outside: true,
+        year: prevMonthDate.getFullYear(),
+        month: prevMonthDate.getMonth()
+      });
     }
 
     // Current month days
     for (let d = 1; d <= daysInMonth; d++) {
-      cells.push({ date: d, outside: false });
+      cells.push({ date: d, outside: false, year: viewYear, month: viewMonth });
     }
 
     // Trailing days (next month) to complete final week row
@@ -269,7 +362,13 @@
     if (remainder !== 0) {
       const trailing = 7 - remainder;
       for (let d = 1; d <= trailing; d++) {
-        cells.push({ date: d, outside: true, isNext: true });
+        cells.push({
+          date: d,
+          outside: true,
+          isNext: true,
+          year: nextMonthDate.getFullYear(),
+          month: nextMonthDate.getMonth()
+        });
       }
     }
 
@@ -280,6 +379,7 @@
       if (cell.outside) dayEl.classList.add('outside');
       if (weekday === 0) dayEl.classList.add('sunday');
       if (weekday === 6) dayEl.classList.add('saturday');
+      if (isHoliday(cell.year, cell.month, cell.date)) dayEl.classList.add('holiday');
 
       const isToday =
         !cell.outside &&
